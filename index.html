@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Housing Map</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .popup-card { font-family: Arial, sans-serif; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); padding: 10px; }
+    .popup-card h3 { margin: 0 0 6px; font-size: 1.1em; }
+    .popup-card p { margin: 4px 0; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+
+  <script>
+    // Initialize map
+    const map = L.map('map').setView([35.9, -79.05], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    const housesLayer = L.layerGroup();
+    const neighborhoodsLayer = L.layerGroup();
+
+    function getColor(score) {
+      return score > 0.8 ? '#1a9641' :
+             score > 0.6 ? '#a6d96a' :
+             score > 0.4 ? '#ffffbf' :
+             score > 0.2 ? '#fdae61' :
+                          '#d7191c';
+    }
+
+    // Load your CSV from same folder: place houses.csv next to index.html
+    Papa.parse('houses.csv', {
+      download: true,
+      header: true,
+      dynamicTyping: true,
+      complete: ({ data }) => {
+        // Group by the 'Neighborhood' field
+        const groups = {};
+        data.forEach(d => {
+          if (d.latitude && d.longitude && d.Neighborhood) {
+            if (!groups[d.Neighborhood]) groups[d.Neighborhood] = [];
+            groups[d.Neighborhood].push(d);
+          }
+        });
+
+        // Build neighborhood polygons and house markers
+        Object.entries(groups).forEach(([neigh, items]) => {
+          // Turf.js points for convex hull
+          const pts = items.map(d => turf.point([d.longitude, d.latitude]));
+          const hull = turf.convex(turf.featureCollection(pts));
+
+          // Average safety score
+          const avgSafety = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
+
+          if (hull) {
+            const coords = hull.geometry.coordinates[0].map(c => [c[1], c[0]]);
+            L.polygon(coords, {
+              fillColor: getColor(avgSafety),
+              fillOpacity: 0.6,
+              color: '#333',
+              weight: 1
+            })
+            .bindPopup(`<div class="popup-card"><h3>${neigh}</h3><p>Avg Safety Score: ${avgSafety.toFixed(2)}</p></div>`)
+            .addTo(neighborhoodsLayer);
+          }
+
+          // Add house markers
+          items.forEach(d => {
+            L.circleMarker([d.latitude, d.longitude], {
+              radius: 6, fillColor: '#0074D9', fillOpacity: 0.8,
+              color: '#fff', weight: 1
+            })
+            .bindPopup(
+              `<div class="popup-card">` +
+                `<h3>${d.address}</h3>` +
+                `<p><strong>Price:</strong> $${d.price.toLocaleString()}</p>` +
+                `<p><strong>Safety Score:</strong> ${d.Safety_Score}</p>` +
+                `<p><strong>Bedrooms:</strong> ${d.bedrooms}, <strong>Bathrooms:</strong> ${d.bathrooms}</p>` +
+              `</div>`
+            )
+            .addTo(housesLayer);
+          });
+        });
+
+        // Show neighborhoods by default (zoomed-out)
+        neighborhoodsLayer.addTo(map);
+      }
+    });
+
+    // Toggle layers at zoom 14
+    map.on('zoomend', () => {
+      const z = map.getZoom();
+      if (z < 14) {
+        map.hasLayer(housesLayer) && map.removeLayer(housesLayer);
+        map.hasLayer(neighborhoodsLayer) || map.addLayer(neighborhoodsLayer);
+      } else {
+        map.hasLayer(neighborhoodsLayer) && map.removeLayer(neighborhoodsLayer);
+        map.hasLayer(housesLayer) || map.addLayer(housesLayer);
+      }
+    });
+  </script>
+</body>
+</html>
