@@ -60,9 +60,13 @@
           const pts = items.map(d => turf.point([d.longitude, d.latitude]));
           const hull = turf.convex(turf.featureCollection(pts));
 
-          // Average safety score
-          const avgSafety = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
+          // Compute average metrics
+          const avgSafety   = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
+          const avgSchool   = items.reduce((sum, x) => sum + (x.avg_school_score || 0), 0) / items.length;
+          const avgAccess   = items.reduce((sum, x) => sum + (x.route_accessibility_score || 0), 0) / items.length;
+          const avgWeighted = items.reduce((sum, x) => sum + (x.weighted_score || 0), 0) / items.length;
 
+          // Draw neighborhood hull
           if (hull) {
             const coords = hull.geometry.coordinates[0].map(c => [c[1], c[0]]);
             L.polygon(coords, {
@@ -71,11 +75,19 @@
               color: '#333',
               weight: 1
             })
-            .bindPopup(`<div class="popup-card"><h3>${neigh}</h3><p>Avg Safety Score: ${avgSafety.toFixed(2)}</p></div>`)
+            .bindPopup(
+              `<div class="popup-card">` +
+                `<h3>${neigh}</h3>` +
+                `<p><strong>Avg Safety Score:</strong> ${avgSafety.toFixed(2)}</p>` +
+                `<p><strong>Avg School Rating:</strong> ${avgSchool.toFixed(2)}</p>` +
+                `<p><strong>Avg Access to Transportation:</strong> ${avgAccess.toFixed(2)}</p>` +
+                `<p><strong>Avg House Score:</strong> ${avgWeighted.toFixed(2)}</p>` +
+              `</div>`
+            )
             .addTo(neighborhoodsLayer);
           }
 
-          // Add house markers
+          // Add individual house markers
           items.forEach(d => {
             L.circleMarker([d.latitude, d.longitude], {
               radius: 6, fillColor: '#0074D9', fillOpacity: 0.8,
@@ -86,6 +98,9 @@
                 `<h3>${d.address}</h3>` +
                 `<p><strong>Price:</strong> $${d.price.toLocaleString()}</p>` +
                 `<p><strong>Safety Score:</strong> ${d.Safety_Score}</p>` +
+                `<p><strong>Avg School Rating:</strong> ${d.avg_school_score}</p>` +
+                `<p><strong>Access to Transportation:</strong> ${d.route_accessibility_score}</p>` +
+                `<p><strong>Overall House Score:</strong> ${d.weighted_score}</p>` +
                 `<p><strong>Bedrooms:</strong> ${d.bedrooms}, <strong>Bathrooms:</strong> ${d.bathrooms}</p>` +
               `</div>`
             )
@@ -93,12 +108,12 @@
           });
         });
 
-        // Show neighborhoods by default (zoomed-out)
+        // Show neighborhoods by default
         neighborhoodsLayer.addTo(map);
       }
     });
 
-    // Toggle layers at zoom 14
+    // Toggle layers based on zoom
     map.on('zoomend', () => {
       const z = map.getZoom();
       if (z < 14) {
