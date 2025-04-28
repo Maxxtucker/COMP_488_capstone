@@ -4,15 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Interactive Housing Map</title>
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .popup-card { font-family: Arial, sans-serif; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); padding: 10px; }
-    .popup-card h3 { margin: 0 0 6px; font-size: 1.1em; }
+    .popup-card {
+      font-family: Arial, sans-serif;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 10px;
+      max-width: 250px;
+    }
+    .popup-card h3 { margin: 8px 0 6px; font-size: 1.1em; }
     .popup-card p { margin: 4px 0; font-size: 0.9em; }
+    .popup-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      object-fit: cover;
+    }
   </style>
 </head>
+
 <body>
   <div id="map"></div>
 
@@ -24,6 +40,7 @@
   <script>
     // Initialize map
     const map = L.map('map').setView([35.9, -79.05], 13);
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
@@ -39,13 +56,13 @@
                           '#d7191c';
     }
 
-    // Load your CSV from same folder: place houses.csv next to index.html
+    // Load houses.csv
     Papa.parse('houses.csv', {
       download: true,
       header: true,
       dynamicTyping: true,
       complete: ({ data }) => {
-        // Group by the 'Neighborhood' field
+        // Group houses by neighborhood
         const groups = {};
         data.forEach(d => {
           if (d.latitude && d.longitude && d.Neighborhood) {
@@ -54,19 +71,19 @@
           }
         });
 
-        // Build neighborhood polygons and house markers
+        // Build neighborhoods and house markers
         Object.entries(groups).forEach(([neigh, items]) => {
-          // Turf.js points for convex hull
+          // Neighborhood hull
           const pts = items.map(d => turf.point([d.longitude, d.latitude]));
           const hull = turf.convex(turf.featureCollection(pts));
 
           // Compute average metrics
           const avgSafety   = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
           const avgSchool   = items.reduce((sum, x) => sum + (x.avg_school_score || 0), 0) / items.length;
-          const avgAccess   = items.reduce((sum, x) => sum + (x.route_accessibility_score || 0), 0) / items.length;
-          const avgWeighted = items.reduce((sum, x) => sum + (x.weighted_score || 0), 0) / items.length;
+          const avgAccess   = items.reduce((sum, x) => sum + (x.normalized_route_accessibility_score || 0), 0) / items.length;
+          const avgShiftedWeighted = items.reduce((sum, x) => sum + (x.shifted_weighted_score || 0), 0) / items.length;
 
-          // Draw neighborhood hull
+          // Draw neighborhood polygon
           if (hull) {
             const coords = hull.geometry.coordinates[0].map(c => [c[1], c[0]]);
             L.polygon(coords, {
@@ -78,30 +95,35 @@
             .bindPopup(
               `<div class="popup-card">` +
                 `<h3>${neigh}</h3>` +
-                `<p><strong>Avg Safety Score:</strong> ${avgSafety.toFixed(2)}</p>` +
-                `<p><strong>Avg School Rating:</strong> ${avgSchool.toFixed(2)}</p>` +
-                `<p><strong>Avg Access to Transportation:</strong> ${avgAccess.toFixed(2)}</p>` +
-                `<p><strong>Avg House Score:</strong> ${avgWeighted.toFixed(2)}</p>` +
+                `<p><strong>Avg Safety Score:</strong> ${Math.round(avgSafety * 10)}/10</p>` +
+                `<p><strong>Avg School Rating:</strong> ${Math.round(avgSchool * 10)}/10</p>` +
+                `<p><strong>Avg Transit Score:</strong> ${Math.round(avgAccess * 10)}/10</p>` +
+                `<p><strong>Avg House Score:</strong> ${Math.round(avgShiftedWeighted * 10)}/10</p>` +
               `</div>`
             )
             .addTo(neighborhoodsLayer);
           }
 
-          // Add individual house markers
+          // Add house markers
           items.forEach(d => {
             L.circleMarker([d.latitude, d.longitude], {
-              radius: 6, fillColor: '#0074D9', fillOpacity: 0.8,
-              color: '#fff', weight: 1
+              radius: 6,
+              fillColor: '#0074D9',
+              fillOpacity: 0.8,
+              color: '#fff',
+              weight: 1
             })
             .bindPopup(
               `<div class="popup-card">` +
+                (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
                 `<h3>${d.address}</h3>` +
-                `<p><strong>Price:</strong> $${d.price.toLocaleString()}</p>` +
-                `<p><strong>Safety Score:</strong> ${d.Safety_Score}</p>` +
-                `<p><strong>Avg School Rating:</strong> ${d.avg_school_score}</p>` +
-                `<p><strong>Access to Transportation:</strong> ${d.route_accessibility_score}</p>` +
-                `<p><strong>Overall House Score:</strong> ${d.weighted_score}</p>` +
-                `<p><strong>Bedrooms:</strong> ${d.bedrooms}, <strong>Bathrooms:</strong> ${d.bathrooms}</p>` +
+                `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
+                `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
+                `<p><strong>Safety Score:</strong> ${d.Safety_Score != null ? Math.round(d.Safety_Score * 10) + "/10" : 'N/A'}</p>` +
+                `<p><strong>Avg School Rating:</strong> ${d.avg_school_score != null ? Math.round(d.avg_school_score * 10) + "/10" : 'N/A'}</p>` +
+                `<p><strong>Transit Score:</strong> ${d.normalized_route_accessibility_score != null ? Math.round(d.normalized_route_accessibility_score * 10) + "/10" : 'N/A'}</p>` +
+                `<p><strong>Overall House Score:</strong> ${d.shifted_weighted_score != null ? Math.round(d.shifted_weighted_score * 10) + "/10" : 'N/A'}</p>` +
+                `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
               `</div>`
             )
             .addTo(housesLayer);
@@ -113,7 +135,7 @@
       }
     });
 
-    // Toggle layers based on zoom
+    // Toggle neighborhoods vs houses based on zoom level
     map.on('zoomend', () => {
       const z = map.getZoom();
       if (z < 14) {
@@ -124,6 +146,7 @@
         map.hasLayer(housesLayer) || map.addLayer(housesLayer);
       }
     });
+
   </script>
 </body>
 </html>
