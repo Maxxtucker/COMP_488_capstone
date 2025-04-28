@@ -172,6 +172,24 @@
       margin-right: 8px;
       border: 1px solid #fff;
     }
+    .view-selector {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+    .view-selector h3 {
+      margin: 0 0 10px;
+      font-size: 1em;
+      color: #333;
+    }
+    .view-selector label {
+      display: block;
+      margin: 6px 0;
+      cursor: pointer;
+    }
+    .view-selector input[type="radio"] {
+      margin-right: 8px;
+    }
   </style>
 </head>
 
@@ -198,8 +216,31 @@
         <input type="checkbox" id="houses-toggle"> Show Houses
       </label>
     </div>
+    <div class="view-selector">
+      <h3>View By</h3>
+      <div>
+        <label>
+          <input type="radio" name="view-type" value="overall" checked> Overall Score
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="radio" name="view-type" value="safety"> Safety Score
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="radio" name="view-type" value="transit"> Transit Score
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="radio" name="view-type" value="school"> School Score
+        </label>
+      </div>
+    </div>
     <div class="house-legend">
-      <h3>House Score Colors</h3>
+      <h3>Score Colors</h3>
       <div class="legend-item">
         <div class="legend-color" style="background-color: #1a9641;"></div>
         <span>8-10 (Excellent)</span>
@@ -353,13 +394,86 @@
     const housesLayer = L.layerGroup();
     const neighborhoodsLayer = L.layerGroup();
 
-    function getColor(score) {
-      return score > 0.8 ? '#1a9641' :
-             score > 0.6 ? '#a6d96a' :
-             score > 0.4 ? '#FFD700' :
-             score > 0.2 ? '#fdae61' :
-                          '#d7191c';
+    // View type selector
+    const viewTypeRadios = document.querySelectorAll('input[name="view-type"]');
+    let currentViewType = 'overall';
+
+    viewTypeRadios.forEach(radio => {
+      radio.addEventListener('change', function() {
+        currentViewType = this.value;
+        updateHouseMarkers();
+      });
+    });
+
+    function updateHouseMarkers() {
+      housesLayer.clearLayers();
+      items.forEach(d => {
+        let score = null;
+        let scoreLabel = 'Overall';
+        
+        switch(currentViewType) {
+          case 'safety':
+            score = d.Safety_Score;
+            scoreLabel = 'Safety';
+            break;
+          case 'transit':
+            score = d.normalized_route_accessibility_score;
+            scoreLabel = 'Transit';
+            break;
+          case 'school':
+            score = d.avg_school_score;
+            scoreLabel = 'School';
+            break;
+          case 'overall':
+          default:
+            const scores = {
+              safety: d.Safety_Score,
+              school: d.avg_school_score,
+              transit: d.normalized_route_accessibility_score
+            };
+            const availableScores = Object.values(scores).filter(s => s !== null);
+            score = availableScores.length > 0 
+              ? availableScores.reduce((sum, s) => sum + s, 0) / availableScores.length
+              : null;
+            scoreLabel = 'Overall';
+        }
+
+        // Determine marker color based on selected score
+        const getMarkerColor = (score) => {
+          if (score === null) return '#999999';
+          return score > 0.8 ? '#1a9641' :
+                 score > 0.6 ? '#a6d96a' :
+                 score > 0.4 ? '#FFD700' :
+                 score > 0.2 ? '#fdae61' :
+                              '#d7191c';
+        };
+
+        L.circleMarker([d.latitude, d.longitude], {
+          radius: 6,
+          fillColor: getMarkerColor(score),
+          fillOpacity: 0.8,
+          color: '#fff',
+          weight: 1
+        })
+        .bindPopup(
+          `<div class="popup-card">` +
+            (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
+            `<div class="overall-score">${scoreLabel} Score: ${score !== null ? Math.round(score * 10) + "/10" : 'N/A'}</div>` +
+            `<h3>${d.address}</h3>` +
+            `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
+            `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
+            `<p><strong>Safety Score:</strong> ${d.Safety_Score != null ? Math.round(d.Safety_Score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>School Rating:</strong> ${d.avg_school_score != null ? Math.round(d.avg_school_score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>Transit Score:</strong> ${d.normalized_route_accessibility_score != null ? Math.round(d.normalized_route_accessibility_score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
+          `</div>`
+        )
+        .addTo(housesLayer);
+      });
     }
+
+    // Initialize the view
+    updateHouseMarkers();
 
     // Load houses.csv
     Papa.parse('houses.csv', {
