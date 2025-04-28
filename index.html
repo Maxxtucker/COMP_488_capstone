@@ -26,6 +26,16 @@
       margin-bottom: 8px;
       object-fit: cover;
     }
+    .overall-score {
+      font-size: 1.4em;
+      font-weight: bold;
+      color: #0074D9;
+      margin: 8px 0;
+      padding: 8px;
+      background-color: #f0f8ff;
+      border-radius: 6px;
+      text-align: center;
+    }
   </style>
 </head>
 
@@ -117,13 +127,13 @@
             .bindPopup(
               `<div class="popup-card">` +
                 (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
+                `<div class="overall-score">Overall Score: ${d.shifted_weighted_score != null ? Math.round(d.shifted_weighted_score * 10) + "/10" : 'N/A'}</div>` +
                 `<h3>${d.address}</h3>` +
                 `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
                 `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
                 `<p><strong>Safety Score:</strong> ${d.Safety_Score != null ? Math.round(d.Safety_Score * 10) + "/10" : 'N/A'}</p>` +
                 `<p><strong>Avg School Rating:</strong> ${d.avg_school_score != null ? Math.round(d.avg_school_score * 10) + "/10" : 'N/A'}</p>` +
                 `<p><strong>Transit Score:</strong> ${d.normalized_route_accessibility_score != null ? Math.round(d.normalized_route_accessibility_score * 10) + "/10" : 'N/A'}</p>` +
-                `<p><strong>Overall House Score:</strong> ${d.shifted_weighted_score != null ? Math.round(d.shifted_weighted_score * 10) + "/10" : 'N/A'}</p>` +
                 `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
               `</div>`
             )
