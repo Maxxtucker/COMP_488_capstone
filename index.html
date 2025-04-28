@@ -216,31 +216,8 @@
         <input type="checkbox" id="houses-toggle"> Show Houses
       </label>
     </div>
-    <div class="view-selector">
-      <h3>View By</h3>
-      <div>
-        <label>
-          <input type="radio" name="view-type" value="overall" checked> Overall Score
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="radio" name="view-type" value="safety"> Safety Score
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="radio" name="view-type" value="transit"> Transit Score
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="radio" name="view-type" value="school"> School Score
-        </label>
-      </div>
-    </div>
     <div class="house-legend">
-      <h3>Score Colors</h3>
+      <h3>House Score Colors</h3>
       <div class="legend-item">
         <div class="legend-color" style="background-color: #1a9641;"></div>
         <span>8-10 (Excellent)</span>
@@ -393,84 +370,13 @@
 
     const housesLayer = L.layerGroup();
     const neighborhoodsLayer = L.layerGroup();
-    let items = []; // Move items array to global scope
 
-    // View type selector
-    const viewTypeRadios = document.querySelectorAll('input[name="view-type"]');
-    let currentViewType = 'overall';
-
-    viewTypeRadios.forEach(radio => {
-      radio.addEventListener('change', function() {
-        currentViewType = this.value;
-        updateHouseMarkers();
-      });
-    });
-
-    function updateHouseMarkers() {
-      housesLayer.clearLayers();
-      items.forEach(d => {
-        let score = null;
-        let scoreLabel = 'Overall';
-        
-        switch(currentViewType) {
-          case 'safety':
-            score = d.Safety_Score;
-            scoreLabel = 'Safety';
-            break;
-          case 'transit':
-            score = d.normalized_route_accessibility_score;
-            scoreLabel = 'Transit';
-            break;
-          case 'school':
-            score = d.avg_school_score;
-            scoreLabel = 'School';
-            break;
-          case 'overall':
-          default:
-            const scores = {
-              safety: d.Safety_Score,
-              school: d.avg_school_score,
-              transit: d.normalized_route_accessibility_score
-            };
-            const availableScores = Object.values(scores).filter(s => s !== null);
-            score = availableScores.length > 0 
-              ? availableScores.reduce((sum, s) => sum + s, 0) / availableScores.length
-              : null;
-            scoreLabel = 'Overall';
-        }
-
-        // Determine marker color based on selected score
-        const getMarkerColor = (score) => {
-          if (score === null) return '#999999';
-          return score > 0.8 ? '#1a9641' :
-                 score > 0.6 ? '#a6d96a' :
-                 score > 0.4 ? '#FFD700' :
-                 score > 0.2 ? '#fdae61' :
-                              '#d7191c';
-        };
-
-        L.circleMarker([d.latitude, d.longitude], {
-          radius: 6,
-          fillColor: getMarkerColor(score),
-          fillOpacity: 0.8,
-          color: '#fff',
-          weight: 1
-        })
-        .bindPopup(
-          `<div class="popup-card">` +
-            (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
-            `<div class="overall-score">${scoreLabel} Score: ${score !== null ? Math.round(score * 10) + "/10" : 'N/A'}</div>` +
-            `<h3>${d.address}</h3>` +
-            `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
-            `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
-            `<p><strong>Safety Score:</strong> ${d.Safety_Score != null ? Math.round(d.Safety_Score * 10) + "/10" : 'N/A'}</p>` +
-            `<p><strong>School Rating:</strong> ${d.avg_school_score != null ? Math.round(d.avg_school_score * 10) + "/10" : 'N/A'}</p>` +
-            `<p><strong>Transit Score:</strong> ${d.normalized_route_accessibility_score != null ? Math.round(d.normalized_route_accessibility_score * 10) + "/10" : 'N/A'}</p>` +
-            `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
-          `</div>`
-        )
-        .addTo(housesLayer);
-      });
+    function getColor(score) {
+      return score > 0.8 ? '#1a9641' :
+             score > 0.6 ? '#a6d96a' :
+             score > 0.4 ? '#FFD700' :
+             score > 0.2 ? '#fdae61' :
+                          '#d7191c';
     }
 
     // Load houses.csv
@@ -481,10 +387,11 @@
       complete: ({ data }) => {
         // Group houses by neighborhood
         const groups = {};
-        items = data.filter(d => d.latitude && d.longitude && d.Neighborhood); // Store filtered items
-        items.forEach(d => {
-          if (!groups[d.Neighborhood]) groups[d.Neighborhood] = [];
-          groups[d.Neighborhood].push(d);
+        data.forEach(d => {
+          if (d.latitude && d.longitude && d.Neighborhood) {
+            if (!groups[d.Neighborhood]) groups[d.Neighborhood] = [];
+            groups[d.Neighborhood].push(d);
+          }
         });
 
         // Build neighborhoods and house markers
@@ -520,11 +427,73 @@
             )
             .addTo(neighborhoodsLayer);
           }
+
+          // Add house markers
+          items.forEach(d => {
+            // Calculate available scores and their count
+            const scores = {
+              safety: d.Safety_Score != null ? d.Safety_Score : null,
+              school: d.avg_school_score != null ? d.avg_school_score : null,
+              transit: d.normalized_route_accessibility_score != null ? d.normalized_route_accessibility_score : null
+            };
+            
+            // Count available scores
+            const availableScores = Object.values(scores).filter(score => score !== null);
+            const scoreCount = availableScores.length;
+            
+            // Calculate simple average of available scores
+            const totalScore = scoreCount > 0 
+              ? availableScores.reduce((sum, score) => sum + score, 0) / scoreCount
+              : null;
+            
+            // Create score indicators
+            const scoreIndicators = Object.entries(scores).map(([key, score]) => {
+              const label = {
+                safety: 'Safety',
+                school: 'School',
+                transit: 'Transit'
+              }[key];
+              
+              return score !== null 
+                ? `<p><strong>${label} Score:</strong> ${Math.round(score * 10)}/10</p>`
+                : `<p><strong>${label} Score:</strong> <span style="color: #999;">Not Available</span></p>`;
+            }).join('');
+            
+            // Determine marker color based on total score
+            const getMarkerColor = (score) => {
+              if (score === null) return '#999999'; // Gray for no score
+              return score > 0.8 ? '#1a9641' : // Green
+                     score > 0.6 ? '#a6d96a' : // Light Green
+                     score > 0.4 ? '#FFD700' : // Bright Yellow
+                     score > 0.2 ? '#fdae61' : // Orange
+                                  '#d7191c';   // Red
+            };
+
+            L.circleMarker([d.latitude, d.longitude], {
+              radius: 6,
+              fillColor: getMarkerColor(totalScore),
+              fillOpacity: 0.8,
+              color: '#fff',
+              weight: 1
+            })
+            .bindPopup(
+              `<div class="popup-card">` +
+                (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
+                `<div class="overall-score">Overall Score: ${totalScore !== null ? Math.round(totalScore * 10) + "/10" : 'N/A'}</div>` +
+                `<h3>${d.address}</h3>` +
+                `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
+                `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
+                scoreIndicators +
+                `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
+                (scoreCount < 3 ? `<p style="color: #666; font-size: 0.8em;">Note: Based on ${scoreCount} available score${scoreCount !== 1 ? 's' : ''}</p>` : '') +
+              `</div>`
+            )
+            .addTo(housesLayer);
+          });
         });
 
-        // Show neighborhoods by default and update house markers
+        // Show neighborhoods by default
         neighborhoodsLayer.addTo(map);
-        updateHouseMarkers();
       }
     });
 
