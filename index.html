@@ -106,20 +106,6 @@
       font-size: 1.1em;
       color: #333;
     }
-    .legend {
-      margin-top: 15px;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      margin: 8px 0;
-    }
-    .legend-color {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      margin-right: 10px;
-    }
     .map-controls {
       position: absolute;
       bottom: 20px;
@@ -189,29 +175,6 @@
       <label>
         <input type="checkbox" id="houses-toggle"> Show Houses
       </label>
-    </div>
-    <div class="legend">
-      <h3>Safety Score Legend</h3>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: #1a9641;"></div>
-        <span>8-10 (Excellent)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: #a6d96a;"></div>
-        <span>6-8 (Good)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: #ffffbf;"></div>
-        <span>4-6 (Average)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: #fdae61;"></div>
-        <span>2-4 (Fair)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background-color: #d7191c;"></div>
-        <span>0-2 (Poor)</span>
-      </div>
     </div>
   </div>
 
@@ -463,9 +426,19 @@
                 : `<p><strong>${label} Score:</strong> <span style="color: #999;">Not Available</span></p>`;
             }).join('');
             
+            // Determine marker color based on total score
+            const getMarkerColor = (score) => {
+              if (score === null) return '#999999'; // Gray for no score
+              return score > 0.8 ? '#1a9641' : // Green
+                     score > 0.6 ? '#a6d96a' : // Light Green
+                     score > 0.4 ? '#ffffbf' : // Yellow
+                     score > 0.2 ? '#fdae61' : // Orange
+                                  '#d7191c';   // Red
+            };
+
             L.circleMarker([d.latitude, d.longitude], {
               radius: 6,
-              fillColor: '#0074D9',
+              fillColor: getMarkerColor(totalScore),
               fillOpacity: 0.8,
               color: '#fff',
               weight: 1
