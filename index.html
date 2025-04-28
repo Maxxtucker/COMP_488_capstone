@@ -14,63 +14,155 @@
       font-family: Arial, sans-serif;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      padding: 10px;
-      max-width: 250px;
+      padding: 15px;
+      max-width: 280px;
     }
-    .popup-card h3 { margin: 8px 0 6px; font-size: 1.1em; }
-    .popup-card p { margin: 4px 0; font-size: 0.9em; }
+    .popup-card h3 { 
+      margin: 8px 0 12px; 
+      font-size: 1.2em;
+      color: #333;
+    }
+    .popup-card p { 
+      margin: 8px 0; 
+      font-size: 0.95em;
+      display: flex;
+      align-items: center;
+    }
     .popup-card img {
       width: 100%;
-      height: auto;
+      height: 180px;
       border-radius: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
       object-fit: cover;
     }
     .overall-score {
-      font-size: 1.4em;
+      font-size: 1.5em;
       font-weight: bold;
       color: #0074D9;
-      margin: 8px 0;
-      padding: 8px;
+      margin: 12px 0;
+      padding: 12px;
       background-color: #f0f8ff;
-      border-radius: 6px;
+      border-radius: 8px;
       text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .search-container {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 20px;
+      right: 20px;
       z-index: 1000;
       background: white;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      width: 300px;
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 320px;
     }
     .search-container input {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      padding: 10px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
       font-size: 14px;
+      transition: all 0.3s ease;
     }
     .search-container input:focus {
       outline: none;
       border-color: #0074D9;
+      box-shadow: 0 0 0 3px rgba(0,116,217,0.1);
     }
     .search-results {
-      max-height: 200px;
+      max-height: 250px;
       overflow-y: auto;
-      margin-top: 5px;
+      margin-top: 8px;
       display: none;
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .search-result-item {
-      padding: 8px;
+      padding: 10px 12px;
       cursor: pointer;
       border-bottom: 1px solid #eee;
+      transition: background-color 0.2s ease;
     }
     .search-result-item:hover {
       background-color: #f5f5f5;
+    }
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+    .control-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .control-panel h3 {
+      margin: 0 0 12px;
+      font-size: 1.1em;
+      color: #333;
+    }
+    .legend {
+      margin-top: 15px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    .map-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 10px;
+    }
+    .map-control-button {
+      background: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .map-control-button:hover {
+      background: #f5f5f5;
+      transform: translateY(-1px);
+    }
+    .loading-spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #0074D9;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .search-wrapper {
+      display: flex;
+      align-items: center;
+    }
+    .metric-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      opacity: 0.7;
     }
   </style>
 </head>
@@ -79,8 +171,57 @@
   <div id="map"></div>
   
   <div class="search-container">
-    <input type="text" id="search-input" placeholder="Search for an address..." />
+    <div class="search-wrapper">
+      <input type="text" id="search-input" placeholder="🔍 Search for an address..." />
+      <div class="loading-spinner" id="loading-spinner"></div>
+    </div>
     <div class="search-results" id="search-results"></div>
+  </div>
+
+  <div class="control-panel">
+    <h3>Map Layers</h3>
+    <div>
+      <label>
+        <input type="checkbox" id="neighborhoods-toggle" checked> Show Neighborhoods
+      </label>
+    </div>
+    <div>
+      <label>
+        <input type="checkbox" id="houses-toggle"> Show Houses
+      </label>
+    </div>
+    <div class="legend">
+      <h3>Safety Score Legend</h3>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #1a9641;"></div>
+        <span>8-10 (Excellent)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #a6d96a;"></div>
+        <span>6-8 (Good)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #ffffbf;"></div>
+        <span>4-6 (Average)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #fdae61;"></div>
+        <span>2-4 (Fair)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background-color: #d7191c;"></div>
+        <span>0-2 (Poor)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-controls">
+    <div class="map-control-button" id="home-button" title="Reset View">
+      🏠 Home
+    </div>
+    <div class="map-control-button" id="fullscreen-button" title="Toggle Fullscreen">
+      ⛶ Fullscreen
+    </div>
   </div>
 
   <!-- Libraries -->
@@ -96,9 +237,13 @@
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
+    // Add scale control
+    L.control.scale({imperial: true, metric: true}).addTo(map);
+
     // Search functionality
     const searchInput = document.getElementById('search-input');
     const searchResults = document.getElementById('search-results');
+    const loadingSpinner = document.getElementById('loading-spinner');
     let searchTimeout;
 
     searchInput.addEventListener('input', function(e) {
@@ -107,9 +252,11 @@
       
       if (query.length < 3) {
         searchResults.style.display = 'none';
+        loadingSpinner.style.display = 'none';
         return;
       }
 
+      loadingSpinner.style.display = 'inline-block';
       searchTimeout = setTimeout(() => {
         fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`)
           .then(response => response.json())
@@ -127,7 +274,6 @@
                   searchResults.style.display = 'none';
                   searchInput.value = result.display_name;
                   
-                  // Add a marker at the searched location
                   L.marker([lat, lon])
                     .addTo(map)
                     .bindPopup(`<b>${result.display_name}</b>`)
@@ -139,12 +285,50 @@
             } else {
               searchResults.style.display = 'none';
             }
+            loadingSpinner.style.display = 'none';
           })
           .catch(error => {
             console.error('Error fetching search results:', error);
             searchResults.style.display = 'none';
+            loadingSpinner.style.display = 'none';
           });
-      }, 500); // Debounce search for 500ms
+      }, 500);
+    });
+
+    // Layer control
+    const neighborhoodsToggle = document.getElementById('neighborhoods-toggle');
+    const housesToggle = document.getElementById('houses-toggle');
+
+    neighborhoodsToggle.addEventListener('change', function() {
+      if (this.checked) {
+        map.addLayer(neighborhoodsLayer);
+      } else {
+        map.removeLayer(neighborhoodsLayer);
+      }
+    });
+
+    housesToggle.addEventListener('change', function() {
+      if (this.checked) {
+        map.addLayer(housesLayer);
+      } else {
+        map.removeLayer(housesLayer);
+      }
+    });
+
+    // Map controls
+    const homeButton = document.getElementById('home-button');
+    const fullscreenButton = document.getElementById('fullscreen-button');
+
+    homeButton.addEventListener('click', () => {
+      map.setView([35.9, -79.05], 13);
+    });
+
+    fullscreenButton.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
     });
 
     // Close search results when clicking outside
