@@ -82,6 +82,7 @@
           const avgSchool   = items.reduce((sum, x) => sum + (x.avg_school_score || 0), 0) / items.length;
           const avgAccess   = items.reduce((sum, x) => sum + (x.normalized_route_accessibility_score || 0), 0) / items.length;
           const avgShiftedWeighted = items.reduce((sum, x) => sum + (x.shifted_weighted_score || 0), 0) / items.length;
+          const avgScore = (avgAccess + avgSchool + avgSafety + avgShiftedWeighted) / 4;
 
           // Draw neighborhood polygon
           if (hull) {
@@ -94,7 +95,7 @@
             })
             .bindPopup(
               `<div class="popup-card">` +
-                `<h3>${neigh}</h3>` +
+                `<h3> Neighborhood #${neigh}</h3>` +
                 `<p><strong>Avg Safety Score:</strong> ${Math.round(avgSafety * 10)}/10</p>` +
                 `<p><strong>Avg School Rating:</strong> ${Math.round(avgSchool * 10)}/10</p>` +
                 `<p><strong>Avg Transit Score:</strong> ${Math.round(avgAccess * 10)}/10</p>` +
