@@ -90,9 +90,19 @@
           // Compute average metrics
           const avgSafety   = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
           const avgSchool   = items.reduce((sum, x) => sum + (x.avg_school_score || 0), 0) / items.length;
-          const avgAccess   = items.reduce((sum, x) => sum + (x.normalized_route_accessibility_score || 0), 0) / items.length;
+          
+          // Improved Transit Score calculation
+          const transitScores = items.map(x => x.normalized_route_accessibility_score || 0);
+          const avgAccess = transitScores.reduce((sum, score) => {
+            // Weight higher scores more heavily (squared)
+            return sum + (score * score);
+          }, 0) / transitScores.reduce((sum, score) => sum + score, 0) || 0;
+          
+          // Scale the transit score to make it more prominent
+          const scaledAvgAccess = Math.min(1, avgAccess * 1.5);
+          
           const avgShiftedWeighted = items.reduce((sum, x) => sum + (x.shifted_weighted_score || 0), 0) / items.length;
-          const avgScore = (avgAccess + avgSchool + avgSafety + avgShiftedWeighted) / 4;
+          const avgScore = (scaledAvgAccess + avgSchool + avgSafety + avgShiftedWeighted) / 4;
 
           // Draw neighborhood polygon
           if (hull) {
@@ -108,7 +118,7 @@
                 `<h3> Neighborhood #${neigh}</h3>` +
                 `<p><strong>Avg Safety Score:</strong> ${Math.round(avgSafety * 10)}/10</p>` +
                 `<p><strong>Avg School Rating:</strong> ${Math.round(avgSchool * 10)}/10</p>` +
-                `<p><strong>Avg Transit Score:</strong> ${Math.round(avgAccess * 10)}/10</p>` +
+                `<p><strong>Avg Transit Score:</strong> ${Math.round(scaledAvgAccess * 10)}/10</p>` +
                 `<p><strong>Avg House Score:</strong> ${Math.round(avgShiftedWeighted * 10)}/10</p>` +
               `</div>`
             )
