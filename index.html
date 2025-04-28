@@ -448,8 +448,7 @@
             const scores = {
               safety: d.Safety_Score != null ? d.Safety_Score : null,
               school: d.avg_school_score != null ? d.avg_school_score : null,
-              transit: d.normalized_route_accessibility_score != null ? d.normalized_route_accessibility_score : null,
-              house: d.shifted_weighted_score != null ? d.shifted_weighted_score : null
+              transit: d.normalized_route_accessibility_score != null ? d.normalized_route_accessibility_score : null
             };
             
             // Count available scores
@@ -466,8 +465,7 @@
               const label = {
                 safety: 'Safety',
                 school: 'School',
-                transit: 'Transit',
-                house: 'House'
+                transit: 'Transit'
               }[key];
               
               return score !== null 
@@ -501,7 +499,7 @@
                 `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
                 scoreIndicators +
                 `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
-                (scoreCount < 4 ? `<p style="color: #666; font-size: 0.8em;">Note: Based on ${scoreCount} available score${scoreCount !== 1 ? 's' : ''}</p>` : '') +
+                (scoreCount < 3 ? `<p style="color: #666; font-size: 0.8em;">Note: Based on ${scoreCount} available score${scoreCount !== 1 ? 's' : ''}</p>` : '') +
               `</div>`
             )
             .addTo(housesLayer);
