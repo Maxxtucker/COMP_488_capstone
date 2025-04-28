@@ -209,7 +209,7 @@
         <span>6-8 (Good)</span>
       </div>
       <div class="legend-item">
-        <div class="legend-color" style="background-color: #ffffbf;"></div>
+        <div class="legend-color" style="background-color: #FFD700;"></div>
         <span>4-6 (Average)</span>
       </div>
       <div class="legend-item">
@@ -356,7 +356,7 @@
     function getColor(score) {
       return score > 0.8 ? '#1a9641' :
              score > 0.6 ? '#a6d96a' :
-             score > 0.4 ? '#ffffbf' :
+             score > 0.4 ? '#FFD700' :
              score > 0.2 ? '#fdae61' :
                           '#d7191c';
     }
@@ -478,7 +478,7 @@
               if (score === null) return '#999999'; // Gray for no score
               return score > 0.8 ? '#1a9641' : // Green
                      score > 0.6 ? '#a6d96a' : // Light Green
-                     score > 0.4 ? '#ffffbf' : // Yellow
+                     score > 0.4 ? '#FFD700' : // Bright Yellow
                      score > 0.2 ? '#fdae61' : // Orange
                                   '#d7191c';   // Red
             };
