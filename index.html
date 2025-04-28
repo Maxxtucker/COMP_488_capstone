@@ -190,6 +190,24 @@
     .view-selector input[type="radio"] {
       margin-right: 8px;
     }
+    .score-selector {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+    .score-selector h3 {
+      margin: 0 0 10px;
+      font-size: 1em;
+      color: #333;
+    }
+    .score-selector select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9em;
+      background-color: white;
+    }
   </style>
 </head>
 
@@ -216,8 +234,17 @@
         <input type="checkbox" id="houses-toggle"> Show Houses
       </label>
     </div>
+    <div class="score-selector">
+      <h3>Color By</h3>
+      <select id="score-type">
+        <option value="overall">Overall Score</option>
+        <option value="safety">Safety Score</option>
+        <option value="school">School Score</option>
+        <option value="transit">Transit Score</option>
+      </select>
+    </div>
     <div class="house-legend">
-      <h3>House Score Colors</h3>
+      <h3>Score Colors</h3>
       <div class="legend-item">
         <div class="legend-color" style="background-color: #1a9641;"></div>
         <span>8-10 (Excellent)</span>
@@ -370,13 +397,83 @@
 
     const housesLayer = L.layerGroup();
     const neighborhoodsLayer = L.layerGroup();
+    let houseMarkers = []; // Store house markers for easy updates
 
-    function getColor(score) {
-      return score > 0.8 ? '#1a9641' :
-             score > 0.6 ? '#a6d96a' :
-             score > 0.4 ? '#FFD700' :
-             score > 0.2 ? '#fdae61' :
-                          '#d7191c';
+    // Score type selector
+    const scoreTypeSelect = document.getElementById('score-type');
+    let currentScoreType = 'overall';
+
+    scoreTypeSelect.addEventListener('change', function() {
+      currentScoreType = this.value;
+      updateHouseMarkers();
+    });
+
+    function updateHouseMarkers() {
+      housesLayer.clearLayers();
+      houseMarkers.forEach(marker => {
+        const d = marker.data;
+        let score = null;
+        let scoreLabel = 'Overall';
+
+        switch(currentScoreType) {
+          case 'safety':
+            score = d.Safety_Score;
+            scoreLabel = 'Safety';
+            break;
+          case 'school':
+            score = d.avg_school_score;
+            scoreLabel = 'School';
+            break;
+          case 'transit':
+            score = d.normalized_route_accessibility_score;
+            scoreLabel = 'Transit';
+            break;
+          case 'overall':
+          default:
+            const scores = {
+              safety: d.Safety_Score,
+              school: d.avg_school_score,
+              transit: d.normalized_route_accessibility_score
+            };
+            const availableScores = Object.values(scores).filter(s => s !== null);
+            score = availableScores.length > 0 
+              ? availableScores.reduce((sum, s) => sum + s, 0) / availableScores.length
+              : null;
+            scoreLabel = 'Overall';
+        }
+
+        // Determine marker color based on selected score
+        const getMarkerColor = (score) => {
+          if (score === null) return '#999999';
+          return score > 0.8 ? '#1a9641' :
+                 score > 0.6 ? '#a6d96a' :
+                 score > 0.4 ? '#FFD700' :
+                 score > 0.2 ? '#fdae61' :
+                              '#d7191c';
+        };
+
+        L.circleMarker([d.latitude, d.longitude], {
+          radius: 6,
+          fillColor: getMarkerColor(score),
+          fillOpacity: 0.8,
+          color: '#fff',
+          weight: 1
+        })
+        .bindPopup(
+          `<div class="popup-card">` +
+            (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
+            `<div class="overall-score">${scoreLabel} Score: ${score !== null ? Math.round(score * 10) + "/10" : 'N/A'}</div>` +
+            `<h3>${d.address}</h3>` +
+            `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
+            `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
+            `<p><strong>Safety Score:</strong> ${d.Safety_Score != null ? Math.round(d.Safety_Score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>School Rating:</strong> ${d.avg_school_score != null ? Math.round(d.avg_school_score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>Transit Score:</strong> ${d.normalized_route_accessibility_score != null ? Math.round(d.normalized_route_accessibility_score * 10) + "/10" : 'N/A'}</p>` +
+            `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
+          `</div>`
+        )
+        .addTo(housesLayer);
+      });
     }
 
     // Load houses.csv
@@ -428,72 +525,15 @@
             .addTo(neighborhoodsLayer);
           }
 
-          // Add house markers
+          // Store house data for later use
           items.forEach(d => {
-            // Calculate available scores and their count
-            const scores = {
-              safety: d.Safety_Score != null ? d.Safety_Score : null,
-              school: d.avg_school_score != null ? d.avg_school_score : null,
-              transit: d.normalized_route_accessibility_score != null ? d.normalized_route_accessibility_score : null
-            };
-            
-            // Count available scores
-            const availableScores = Object.values(scores).filter(score => score !== null);
-            const scoreCount = availableScores.length;
-            
-            // Calculate simple average of available scores
-            const totalScore = scoreCount > 0 
-              ? availableScores.reduce((sum, score) => sum + score, 0) / scoreCount
-              : null;
-            
-            // Create score indicators
-            const scoreIndicators = Object.entries(scores).map(([key, score]) => {
-              const label = {
-                safety: 'Safety',
-                school: 'School',
-                transit: 'Transit'
-              }[key];
-              
-              return score !== null 
-                ? `<p><strong>${label} Score:</strong> ${Math.round(score * 10)}/10</p>`
-                : `<p><strong>${label} Score:</strong> <span style="color: #999;">Not Available</span></p>`;
-            }).join('');
-            
-            // Determine marker color based on total score
-            const getMarkerColor = (score) => {
-              if (score === null) return '#999999'; // Gray for no score
-              return score > 0.8 ? '#1a9641' : // Green
-                     score > 0.6 ? '#a6d96a' : // Light Green
-                     score > 0.4 ? '#FFD700' : // Bright Yellow
-                     score > 0.2 ? '#fdae61' : // Orange
-                                  '#d7191c';   // Red
-            };
-
-            L.circleMarker([d.latitude, d.longitude], {
-              radius: 6,
-              fillColor: getMarkerColor(totalScore),
-              fillOpacity: 0.8,
-              color: '#fff',
-              weight: 1
-            })
-            .bindPopup(
-              `<div class="popup-card">` +
-                (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
-                `<div class="overall-score">Overall Score: ${totalScore !== null ? Math.round(totalScore * 10) + "/10" : 'N/A'}</div>` +
-                `<h3>${d.address}</h3>` +
-                `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
-                `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
-                scoreIndicators +
-                `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
-                (scoreCount < 3 ? `<p style="color: #666; font-size: 0.8em;">Note: Based on ${scoreCount} available score${scoreCount !== 1 ? 's' : ''}</p>` : '') +
-              `</div>`
-            )
-            .addTo(housesLayer);
+            houseMarkers.push({ data: d });
           });
         });
 
-        // Show neighborhoods by default
+        // Show neighborhoods by default and update house markers
         neighborhoodsLayer.addTo(map);
+        updateHouseMarkers();
       }
     });
 
