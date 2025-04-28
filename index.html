@@ -393,6 +393,7 @@
 
     const housesLayer = L.layerGroup();
     const neighborhoodsLayer = L.layerGroup();
+    let items = []; // Move items array to global scope
 
     // View type selector
     const viewTypeRadios = document.querySelectorAll('input[name="view-type"]');
@@ -472,9 +473,6 @@
       });
     }
 
-    // Initialize the view
-    updateHouseMarkers();
-
     // Load houses.csv
     Papa.parse('houses.csv', {
       download: true,
@@ -483,11 +481,10 @@
       complete: ({ data }) => {
         // Group houses by neighborhood
         const groups = {};
-        data.forEach(d => {
-          if (d.latitude && d.longitude && d.Neighborhood) {
-            if (!groups[d.Neighborhood]) groups[d.Neighborhood] = [];
-            groups[d.Neighborhood].push(d);
-          }
+        items = data.filter(d => d.latitude && d.longitude && d.Neighborhood); // Store filtered items
+        items.forEach(d => {
+          if (!groups[d.Neighborhood]) groups[d.Neighborhood] = [];
+          groups[d.Neighborhood].push(d);
         });
 
         // Build neighborhoods and house markers
@@ -496,50 +493,18 @@
           const pts = items.map(d => turf.point([d.longitude, d.latitude]));
           const hull = turf.convex(turf.featureCollection(pts));
 
-          // Compute average metrics with improved calculations
-          
-          // Safety Score: Weight higher scores more heavily and consider distribution
-          const safetyScores = items.map(x => x.Safety_Score || 0);
-          const avgSafety = safetyScores.reduce((sum, score) => {
-            // Weight higher safety scores more heavily (cubed for stronger emphasis)
-            return sum + (score * score * score);
-          }, 0) / safetyScores.reduce((sum, score) => sum + score * score, 0) || 0;
-          
-          // School Rating: Emphasize higher quality schools
-          const schoolScores = items.map(x => x.avg_school_score || 0);
-          const avgSchool = schoolScores.reduce((sum, score) => {
-            // Exponential weighting for school scores
-            return sum + (score * Math.exp(score));
-          }, 0) / schoolScores.reduce((sum, score) => sum + Math.exp(score), 0) || 0;
-          
-          // Transit Score: Weight higher scores more heavily
-          const transitScores = items.map(x => x.normalized_route_accessibility_score || 0);
-          const avgAccess = transitScores.reduce((sum, score) => {
-            // Weight higher scores more heavily (squared)
-            return sum + (score * score);
-          }, 0) / transitScores.reduce((sum, score) => sum + score, 0) || 0;
-          
-          // House Score: Consider both average and distribution of quality
-          const houseScores = items.map(x => x.shifted_weighted_score || 0);
-          const avgShiftedWeighted = houseScores.reduce((sum, score) => {
-            // Weight higher quality houses more heavily
-            return sum + (score * Math.sqrt(score));
-          }, 0) / houseScores.reduce((sum, score) => sum + Math.sqrt(score), 0) || 0;
-          
-          // Scale the scores to make them more prominent while keeping them in range
-          const scaledAvgAccess = Math.min(1, avgAccess * 1.5);
-          const scaledAvgSafety = Math.min(1, avgSafety * 1.2);
-          const scaledAvgSchool = Math.min(1, avgSchool * 1.3);
-          const scaledAvgHouse = Math.min(1, avgShiftedWeighted * 1.2);
-          
-          // Calculate final average score
-          const avgScore = (scaledAvgAccess + scaledAvgSchool + scaledAvgSafety + scaledAvgHouse) / 4;
+          // Compute average metrics
+          const avgSafety   = items.reduce((sum, x) => sum + (x.Safety_Score || 0), 0) / items.length;
+          const avgSchool   = items.reduce((sum, x) => sum + (x.avg_school_score || 0), 0) / items.length;
+          const avgAccess   = items.reduce((sum, x) => sum + (x.normalized_route_accessibility_score || 0), 0) / items.length;
+          const avgShiftedWeighted = items.reduce((sum, x) => sum + (x.shifted_weighted_score || 0), 0) / items.length;
+          const avgScore = (avgAccess + avgSchool + avgSafety + avgShiftedWeighted) / 4;
 
           // Draw neighborhood polygon
           if (hull) {
             const coords = hull.geometry.coordinates[0].map(c => [c[1], c[0]]);
             L.polygon(coords, {
-              fillColor: getColor(scaledAvgSafety),
+              fillColor: getColor(avgSafety),
               fillOpacity: 0.6,
               color: '#333',
               weight: 1
@@ -547,81 +512,19 @@
             .bindPopup(
               `<div class="popup-card">` +
                 `<h3> Neighborhood #${neigh}</h3>` +
-                `<p><strong>Avg Safety Score:</strong> ${Math.round(scaledAvgSafety * 10)}/10</p>` +
-                `<p><strong>Avg School Rating:</strong> ${Math.round(scaledAvgSchool * 10)}/10</p>` +
-                `<p><strong>Avg Transit Score:</strong> ${Math.round(scaledAvgAccess * 10)}/10</p>` +
-                `<p><strong>Avg House Score:</strong> ${Math.round(scaledAvgHouse * 10)}/10</p>` +
+                `<p><strong>Avg Safety Score:</strong> ${Math.round(avgSafety * 10)}/10</p>` +
+                `<p><strong>Avg School Rating:</strong> ${Math.round(avgSchool * 10)}/10</p>` +
+                `<p><strong>Avg Transit Score:</strong> ${Math.round(avgAccess * 10)}/10</p>` +
+                `<p><strong>Avg House Score:</strong> ${Math.round(avgShiftedWeighted * 10)}/10</p>` +
               `</div>`
             )
             .addTo(neighborhoodsLayer);
           }
-
-          // Add house markers
-          items.forEach(d => {
-            // Calculate available scores and their count
-            const scores = {
-              safety: d.Safety_Score != null ? d.Safety_Score : null,
-              school: d.avg_school_score != null ? d.avg_school_score : null,
-              transit: d.normalized_route_accessibility_score != null ? d.normalized_route_accessibility_score : null
-            };
-            
-            // Count available scores
-            const availableScores = Object.values(scores).filter(score => score !== null);
-            const scoreCount = availableScores.length;
-            
-            // Calculate simple average of available scores
-            const totalScore = scoreCount > 0 
-              ? availableScores.reduce((sum, score) => sum + score, 0) / scoreCount
-              : null;
-            
-            // Create score indicators
-            const scoreIndicators = Object.entries(scores).map(([key, score]) => {
-              const label = {
-                safety: 'Safety',
-                school: 'School',
-                transit: 'Transit'
-              }[key];
-              
-              return score !== null 
-                ? `<p><strong>${label} Score:</strong> ${Math.round(score * 10)}/10</p>`
-                : `<p><strong>${label} Score:</strong> <span style="color: #999;">Not Available</span></p>`;
-            }).join('');
-            
-            // Determine marker color based on total score
-            const getMarkerColor = (score) => {
-              if (score === null) return '#999999'; // Gray for no score
-              return score > 0.8 ? '#1a9641' : // Green
-                     score > 0.6 ? '#a6d96a' : // Light Green
-                     score > 0.4 ? '#FFD700' : // Bright Yellow
-                     score > 0.2 ? '#fdae61' : // Orange
-                                  '#d7191c';   // Red
-            };
-
-            L.circleMarker([d.latitude, d.longitude], {
-              radius: 6,
-              fillColor: getMarkerColor(totalScore),
-              fillOpacity: 0.8,
-              color: '#fff',
-              weight: 1
-            })
-            .bindPopup(
-              `<div class="popup-card">` +
-                (d.image_url ? `<img src="${d.image_url}" alt="House Image">` : '') +
-                `<div class="overall-score">Overall Score: ${totalScore !== null ? Math.round(totalScore * 10) + "/10" : 'N/A'}</div>` +
-                `<h3>${d.address}</h3>` +
-                `<p><strong>Home Type:</strong> ${d.homeType || 'Unknown'}</p>` +
-                `<p><strong>Price:</strong> $${d.price?.toLocaleString() || 'N/A'}</p>` +
-                scoreIndicators +
-                `<p><strong>Bedrooms:</strong> ${d.bedrooms ?? 'N/A'}, <strong>Bathrooms:</strong> ${d.bathrooms ?? 'N/A'}</p>` +
-                (scoreCount < 3 ? `<p style="color: #666; font-size: 0.8em;">Note: Based on ${scoreCount} available score${scoreCount !== 1 ? 's' : ''}</p>` : '') +
-              `</div>`
-            )
-            .addTo(housesLayer);
-          });
         });
 
-        // Show neighborhoods by default
+        // Show neighborhoods by default and update house markers
         neighborhoodsLayer.addTo(map);
+        updateHouseMarkers();
       }
     });
 
